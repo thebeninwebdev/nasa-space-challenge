@@ -12,16 +12,15 @@ import {
 import { Badge } from "@/components/ui/badge"
 import {
   Satellite,
-  Eye,
   Calendar,
   MapPin,
 } from "lucide-react"
 
 interface ImageryResponse {
-  trueColor: string
-  metadata: {
-    date: string
-    satellite: string
+  trueColor?: string
+  metadata?: {
+    date?: string
+    satellite?: string
   }
   error?: string
 }
@@ -32,7 +31,7 @@ interface SatelliteImageryModalProps {
   location: {
     lat: number
     lon: number
-    name: string
+    name?: string
   } | null
   date?: string
 }
@@ -45,30 +44,39 @@ export function SatelliteImageryModal({
 }: SatelliteImageryModalProps) {
   const [imagery, setImagery] = useState<ImageryResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !location) {
       setImagery(null)
+      setError(null)
       return
     }
 
     const fetchImagery = async () => {
       setLoading(true)
+      setError(null)
       try {
         const currentDate = date || new Date().toISOString().split("T")[0]
         const query = new URLSearchParams({
-          lat: location.lat.toString(),
-          lon: location.lon.toString(),
+          lat: location?.lat?.toString() ?? "",
+          lon: location?.lon?.toString() ?? "",
           date: currentDate,
         })
 
         const res = await fetch(`/api/satellite?${query.toString()}`)
+
+        if (!res.ok) {
+          console.log(`HTTP error: ${res.status}`)
+        }
+
         const data: ImageryResponse = await res.json()
-        if (data.error) throw new Error(data.error)
+        if (data?.error) console.log(data.error)
 
         setImagery(data)
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching imagery:", err)
+        setError(err?.message || "Failed to load satellite imagery.")
         setImagery(null)
       } finally {
         setLoading(false)
@@ -99,16 +107,16 @@ export function SatelliteImageryModal({
           <div className="flex flex-wrap gap-3">
             <Badge variant="secondary" className="gap-2 px-3 py-1.5 text-sm">
               <MapPin className="w-4 h-4" />
-              {location.name}
+              {location?.name || "Unknown location"}
             </Badge>
             <Badge variant="outline" className="gap-2 px-3 py-1.5 text-sm">
               <Calendar className="w-4 h-4" />
-              {imagery?.metadata.date || date || "Latest"}
+              {imagery?.metadata?.date || date || "Latest"}
             </Badge>
-            {imagery && (
+            {imagery?.metadata?.satellite && (
               <Badge variant="outline" className="gap-2 px-3 py-1.5 text-sm">
                 <Satellite className="w-4 h-4" />
-                {imagery.metadata.satellite}
+                {imagery?.metadata?.satellite}
               </Badge>
             )}
           </div>
@@ -120,20 +128,30 @@ export function SatelliteImageryModal({
                 <p className="text-muted-foreground">Loading satellite imagery...</p>
               </div>
             </div>
-          ) : imagery ? (
+          ) : imagery?.trueColor ? (
             <div className="space-y-4">
               <div className="text-sm font-semibold text-muted-foreground">True Color Imagery</div>
               <div className="relative rounded-xl overflow-hidden border-2 border-border shadow-2xl group">
                 <img
-                  src={imagery.trueColor}
+                  src={imagery?.trueColor}
                   alt="True Color"
                   className="w-full h-auto object-cover"
                 />
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-96 bg-muted/30 rounded-xl border-2 border-dashed border-border">
-              <p className="text-muted-foreground">Failed to load imagery</p>
+            <div className="space-y-4">
+              <div className="text-sm font-semibold text-muted-foreground">Imagery Unavailable</div>
+              <div className="relative rounded-xl overflow-hidden border-2 border-border shadow-2xl group">
+                <img
+                  src="/fallback-imagery.jpg"
+                  alt="Fallback Imagery"
+                  className="w-full h-96 object-cover opacity-70"
+                />
+                <div className="absolute inset-0 bg-black/50 text-white flex items-center justify-center p-4 text-center text-sm">
+                  <p>{error || "Failed to load satellite imagery."}</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
